@@ -47,7 +47,7 @@
             <version>3.11.2</version>
         </dependency>
         <dependency>
-            <groupId>com.lightspeed-hospitality</groupId>
+            <groupId>com.ikentoo</groupId>
             <artifactId>hazelcast-aws-ecs</artifactId>
             <version>0.0.1</version>
             <scope>system</scope>

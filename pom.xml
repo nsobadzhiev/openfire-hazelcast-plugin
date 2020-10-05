@@ -47,9 +47,11 @@
             <version>3.12.5</version>
         </dependency>
         <dependency>
-            <groupId>com.hazelcast</groupId>
-            <artifactId>hazelcast-aws</artifactId>
-            <version>2.4</version>
+            <groupId>com.ikentoo</groupId>
+            <artifactId>hazelcast-aws-ecs</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/lib/hazelcast-aws-ecs-0.0.1-SNAPSHOT.jar</systemPath>
         </dependency>
     </dependencies>
 

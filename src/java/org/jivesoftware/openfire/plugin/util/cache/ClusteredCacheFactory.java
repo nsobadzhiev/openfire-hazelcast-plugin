@@ -16,25 +16,11 @@
 
 package org.jivesoftware.openfire.plugin.util.cache;
 
-import java.io.Serializable;
-import java.nio.charset.StandardCharsets;
-import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.Future;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-
+import com.hazelcast.cluster.Cluster;
+import com.hazelcast.cluster.Member;
+import com.hazelcast.config.*;
+import com.hazelcast.core.Hazelcast;
+import com.hazelcast.core.HazelcastInstance;
 import org.jivesoftware.openfire.JMXManager;
 import org.jivesoftware.openfire.XMPPServer;
 import org.jivesoftware.openfire.cluster.ClusterEventListener;
@@ -45,25 +31,17 @@ import org.jivesoftware.openfire.plugin.session.RemoteSessionLocator;
 import org.jivesoftware.openfire.plugin.util.cluster.ClusterPacketRouter;
 import org.jivesoftware.openfire.plugin.util.cluster.HazelcastClusterNodeInfo;
 import org.jivesoftware.util.JiveGlobals;
-import org.jivesoftware.util.cache.Cache;
-import org.jivesoftware.util.cache.CacheFactory;
-import org.jivesoftware.util.cache.CacheFactoryStrategy;
-import org.jivesoftware.util.cache.CacheWrapper;
-import org.jivesoftware.util.cache.ClusterTask;
-import org.jivesoftware.util.cache.ExternalizableUtil;
-import org.jivesoftware.util.cache.ExternalizableUtilStrategy;
+import org.jivesoftware.util.cache.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.hazelcast.config.ClasspathXmlConfig;
-import com.hazelcast.config.Config;
-import com.hazelcast.config.MapConfig;
-import com.hazelcast.config.MaxSizeConfig;
-import com.hazelcast.config.MemberAttributeConfig;
-import com.hazelcast.core.Cluster;
-import com.hazelcast.core.Hazelcast;
-import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.core.Member;
+import java.io.Serializable;
+import java.nio.charset.StandardCharsets;
+import java.text.MessageFormat;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
 
 /**
  * CacheFactory implementation to use when using Hazelcast in cluster mode.
@@ -103,8 +81,8 @@ public class ClusteredCacheFactory implements CacheFactoryStrategy {
     private static HazelcastInstance hazelcast = null;
     private static Cluster cluster = null;
     private ClusterListener clusterListener;
-    private String lifecycleListener;
-    private String membershipListener;
+    private UUID lifecycleListener;
+    private UUID membershipListener;
 
     /**
      * Keeps that running state. Initial state is stopped.
@@ -133,8 +111,8 @@ public class ClusteredCacheFactory implements CacheFactoryStrategy {
             try {
                 final Config config = new ClasspathXmlConfig(HAZELCAST_CONFIG_FILE);
                 final MemberAttributeConfig memberAttributeConfig = config.getMemberAttributeConfig();
-                memberAttributeConfig.setStringAttribute(HazelcastClusterNodeInfo.HOST_NAME_ATTRIBUTE, XMPPServer.getInstance().getServerInfo().getHostname());
-                memberAttributeConfig.setStringAttribute(HazelcastClusterNodeInfo.NODE_ID_ATTRIBUTE, XMPPServer.getInstance().getNodeID().toString());
+                memberAttributeConfig.setAttribute(HazelcastClusterNodeInfo.HOST_NAME_ATTRIBUTE, XMPPServer.getInstance().getServerInfo().getHostname());
+                memberAttributeConfig.setAttribute(HazelcastClusterNodeInfo.NODE_ID_ATTRIBUTE, XMPPServer.getInstance().getNodeID().toString());
                 config.setInstanceName("openfire");
                 config.setClassLoader(loader);
                 if (JMXManager.isEnabled() && HAZELCAST_JMX_ENABLED) {
@@ -211,7 +189,7 @@ public class ClusteredCacheFactory implements CacheFactoryStrategy {
             ClusterManager.addListener(clusterEventListener);
             ClusterManager.fireLeftCluster();
             leftClusterSemaphore.tryAcquire(30, TimeUnit.SECONDS);
-        } catch( final Exception e) {
+        } catch (final Exception e) {
             logger.error("Unexpected exception waiting for clustering to shut down", e);
         } finally {
             ClusterManager.removeListener(clusterEventListener);
@@ -258,15 +236,14 @@ public class ClusteredCacheFactory implements CacheFactoryStrategy {
         if (staticConfig == null) {
             final MapConfig dynamicConfig = new MapConfig(name);
             dynamicConfig.setTimeToLiveSeconds(hazelcastLifetimeInSeconds);
-            dynamicConfig.setMaxSizeConfig(new MaxSizeConfig(hazelcastMaxCacheSize, MaxSizeConfig.MaxSizePolicy.USED_HEAP_SIZE));
+            dynamicConfig.setEvictionConfig(new EvictionConfig().setSize(hazelcastMaxCacheSize).setMaxSizePolicy(MaxSizePolicy.USED_HEAP_SIZE));
             logger.debug("Creating dynamic map config for cache={}, dynamicConfig={}", name, dynamicConfig);
             hazelcast.getConfig().addMapConfig(dynamicConfig);
         } else {
             logger.debug("Static configuration already exists for cache={}, staticConfig={}", name, staticConfig);
         }
         // TODO: Better genericize this method in CacheFactoryStrategy so we can stop suppressing this warning
-        @SuppressWarnings("unchecked")
-        final ClusteredCache clusteredCache = new ClusteredCache(name, hazelcast.getMap(name));
+        @SuppressWarnings("unchecked") final ClusteredCache clusteredCache = new ClusteredCache(name, hazelcast.getMap(name));
         return clusteredCache;
     }
 
@@ -513,17 +490,16 @@ public class ClusteredCacheFactory implements CacheFactoryStrategy {
             cache = ((CacheWrapper) cache).getWrappedCache();
         }
         // TODO: Update CacheFactoryStrategy so the signature is getLock(final Serializable key, Cache<Serializable, Serializable> cache)
-        @SuppressWarnings("unchecked")
-        final ClusterLock clusterLock = new ClusterLock((Serializable) key, (ClusteredCache<Serializable, ?>) cache);
+        @SuppressWarnings("unchecked") final ClusterLock clusterLock = new ClusterLock((Serializable) key, (ClusteredCache<Serializable, ?>) cache);
         return clusterLock;
     }
 
     private static class ClusterLock implements Lock {
 
         private final Serializable key;
-        private final ClusteredCache<Serializable,?> cache;
+        private final ClusteredCache<Serializable, ?> cache;
 
-        ClusterLock(final Serializable key, final ClusteredCache<Serializable,?> cache) {
+        ClusterLock(final Serializable key, final ClusteredCache<Serializable, ?> cache) {
             this.key = key;
             this.cache = cache;
         }
@@ -582,7 +558,7 @@ public class ClusteredCacheFactory implements CacheFactoryStrategy {
     }
 
     public static NodeID getNodeID(final Member member) {
-        return NodeID.getInstance(member.getStringAttribute(HazelcastClusterNodeInfo.NODE_ID_ATTRIBUTE).getBytes(StandardCharsets.UTF_8));
+        return NodeID.getInstance(member.getAttribute(HazelcastClusterNodeInfo.NODE_ID_ATTRIBUTE).getBytes(StandardCharsets.UTF_8));
     }
 
 }

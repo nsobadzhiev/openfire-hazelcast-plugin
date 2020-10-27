@@ -15,31 +15,30 @@
  */
 package org.jivesoftware.openfire.plugin.util.cache;
 
-import java.io.Serializable;
-import java.util.Collection;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-
+import com.hazelcast.map.IMap;
+import com.hazelcast.map.LocalMapStats;
+import com.hazelcast.map.listener.MapListener;
 import org.jivesoftware.util.cache.Cache;
 import org.jivesoftware.util.cache.CacheFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.hazelcast.core.IMap;
-import com.hazelcast.map.listener.MapListener;
-import com.hazelcast.monitor.LocalMapStats;
+import java.io.Serializable;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Clustered implementation of the Cache interface using Hazelcast.
- *
  */
 public class ClusteredCache<K extends Serializable, V extends Serializable> implements Cache<K, V> {
 
     private static final Logger logger = LoggerFactory.getLogger(ClusteredCache.class);
-    
-    private final Set<String> listeners = ConcurrentHashMap.newKeySet();
+
+    private final Set<UUID> listeners = ConcurrentHashMap.newKeySet();
 
     /**
      * The map is used for distributed operations such as get, put, etc.
@@ -51,7 +50,7 @@ public class ClusteredCache<K extends Serializable, V extends Serializable> impl
     /**
      * Create a new cache using the supplied named cache as the actual cache implementation
      *
-     * @param name a name for the cache, which should be unique per vm.
+     * @param name  a name for the cache, which should be unique per vm.
      * @param cache the cache implementation
      */
     protected ClusteredCache(final String name, final IMap<K, V> cache) {
@@ -75,7 +74,9 @@ public class ClusteredCache<K extends Serializable, V extends Serializable> impl
 
     @Override
     public V put(final K key, final V object) {
-        if (object == null) { return null; }
+        if (object == null) {
+            return null;
+        }
         return map.put(key, object);
     }
 

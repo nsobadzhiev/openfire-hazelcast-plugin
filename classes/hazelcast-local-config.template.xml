@@ -3,10 +3,7 @@
            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
            xsi:schemaLocation="http://www.hazelcast.com/schema/config
            http://www.hazelcast.com/schema/config/hazelcast-config-3.11.xsd">
-    <group>
-        <name>openfire</name>
-        <password>openfire</password>
-    </group>
+    <cluster-name>openfire</cluster-name>
     <network>
         <port auto-increment="true" port-count="100">5701</port>
         <outbound-ports>

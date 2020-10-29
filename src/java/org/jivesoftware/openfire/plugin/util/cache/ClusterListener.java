@@ -15,25 +15,14 @@
  */
 package org.jivesoftware.openfire.plugin.util.cache;
 
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.locks.Lock;
-
-import org.jivesoftware.openfire.PacketException;
-import org.jivesoftware.openfire.RoutingTable;
-import org.jivesoftware.openfire.SessionManager;
-import org.jivesoftware.openfire.StreamID;
-import org.jivesoftware.openfire.XMPPServer;
+import com.hazelcast.cluster.Cluster;
+import com.hazelcast.cluster.Member;
+import com.hazelcast.cluster.MembershipEvent;
+import com.hazelcast.cluster.MembershipListener;
+import com.hazelcast.core.*;
+import com.hazelcast.core.LifecycleEvent.LifecycleState;
+import com.hazelcast.map.MapEvent;
+import org.jivesoftware.openfire.*;
 import org.jivesoftware.openfire.cluster.ClusterManager;
 import org.jivesoftware.openfire.cluster.ClusterNodeInfo;
 import org.jivesoftware.openfire.cluster.NodeID;
@@ -55,18 +44,10 @@ import org.slf4j.LoggerFactory;
 import org.xmpp.packet.JID;
 import org.xmpp.packet.Presence;
 
-import com.hazelcast.core.Cluster;
-import com.hazelcast.core.EntryEvent;
-import com.hazelcast.core.EntryEventType;
-import com.hazelcast.core.EntryListener;
-import com.hazelcast.core.LifecycleEvent;
-import com.hazelcast.core.LifecycleEvent.LifecycleState;
-import com.hazelcast.core.LifecycleListener;
-import com.hazelcast.core.MapEvent;
-import com.hazelcast.core.Member;
-import com.hazelcast.core.MemberAttributeEvent;
-import com.hazelcast.core.MembershipEvent;
-import com.hazelcast.core.MembershipListener;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.locks.Lock;
 
 /**
  * ClusterListener reacts to membership changes in the cluster. It takes care of cleaning up the state
@@ -78,7 +59,7 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
 
     private static final int C2S_CACHE_IDX = 0;
     private static final int ANONYMOUS_C2S_CACHE_IDX = 1;
-    private static final int COMPONENT_CACHE_IDX= 2;
+    private static final int COMPONENT_CACHE_IDX = 2;
 
     private static final int SESSION_INFO_CACHE_IDX = 3;
     private static final int COMPONENT_SESSION_CACHE_IDX = 4;
@@ -111,11 +92,11 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
     private final Map<NodeID, Map<String, Collection<String>>> nodePresences = new ConcurrentHashMap<>();
     private boolean seniorClusterMember = false;
 
-    private final Map<Cache<?,?>, EntryListener> entryListeners = new HashMap<>();
-    
+    private final Map<Cache<?, ?>, EntryListener> entryListeners = new HashMap<>();
+
     private final Cluster cluster;
     private final Map<NodeID, ClusterNodeInfo> clusterNodesInfo = new ConcurrentHashMap<>();
-    
+
     /**
      * Flag that indicates if the listener has done all clean up work when noticed that the
      * cluster has been stopped. This will force Openfire to wait until all clean
@@ -132,7 +113,7 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
         this.cluster = cluster;
         for (Member member : cluster.getMembers()) {
             clusterNodesInfo.put(ClusteredCacheFactory.getNodeID(member),
-                    new HazelcastClusterNodeInfo(member, cluster.getClusterTime()));
+                new HazelcastClusterNodeInfo(member, cluster.getClusterTime()));
         }
 
         C2SCache = CacheFactory.createCache(RoutingTableImpl.C2S_CACHE_NAME);
@@ -151,9 +132,9 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
 
     private void addEntryListener(Cache<?, ?> cache, EntryListener listener) {
         if (cache instanceof CacheWrapper) {
-            Cache wrapped = ((CacheWrapper)cache).getWrappedCache();
+            Cache wrapped = ((CacheWrapper) cache).getWrappedCache();
             if (wrapped instanceof ClusteredCache) {
-                ((ClusteredCache)wrapped).addEntryListener(listener);
+                ((ClusteredCache) wrapped).addEntryListener(listener);
                 // Keep track of the listener that we added to the cache
                 entryListeners.put(cache, listener);
             }
@@ -162,14 +143,14 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
 
     @SuppressWarnings("unchecked")
     private void simulateCacheInserts(Cache<?, ?> cache) {
-        final EntryListener<?,?> entryListener = entryListeners.get(cache);
+        final EntryListener<?, ?> entryListener = entryListeners.get(cache);
         if (entryListener != null) {
             if (cache instanceof CacheWrapper) {
                 Cache wrapped = ((CacheWrapper) cache).getWrappedCache();
                 if (wrapped instanceof ClusteredCache) {
                     ClusteredCache clusteredCache = (ClusteredCache) wrapped;
                     for (Map.Entry<?, ?> entry : cache.entrySet()) {
-                        EntryEvent event = new EntryEvent<>(
+                        EntryEvent event = new EntryEvent(
                             clusteredCache.map.getName(),
                             cluster.getLocalMember(),
                             EntryEventType.ADDED.getType(),
@@ -191,33 +172,26 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
 
         if (cacheName.equals(C2SCache.getName())) {
             return allLists[C2S_CACHE_IDX];
-        }
-        else if (cacheName.equals(anonymousC2SCache.getName())) {
+        } else if (cacheName.equals(anonymousC2SCache.getName())) {
             return allLists[ANONYMOUS_C2S_CACHE_IDX];
-        }
-        else if (cacheName.equals(componentsCache.getName())) {
+        } else if (cacheName.equals(componentsCache.getName())) {
             return allLists[COMPONENT_CACHE_IDX];
-        }
-        else if (cacheName.equals(sessionInfoCache.getName())) {
+        } else if (cacheName.equals(sessionInfoCache.getName())) {
             return allLists[SESSION_INFO_CACHE_IDX];
-        }
-        else if (cacheName.equals(componentSessionsCache.getName())) {
+        } else if (cacheName.equals(componentSessionsCache.getName())) {
             return allLists[COMPONENT_SESSION_CACHE_IDX];
-        }
-        else if (cacheName.equals(multiplexerSessionsCache.getName())) {
+        } else if (cacheName.equals(multiplexerSessionsCache.getName())) {
             return allLists[CM_CACHE_IDX];
-        }
-        else if (cacheName.equals(incomingServerSessionsCache.getName())) {
+        } else if (cacheName.equals(incomingServerSessionsCache.getName())) {
             return allLists[ISS_CACHE_IDX];
-        }
-        else {
+        } else {
             throw new IllegalArgumentException("Unknown cache name: " + cacheName);
         }
     }
 
     @SuppressWarnings("unchecked")
     private Set<String>[] insertJIDList(NodeID nodeKey) {
-        Set<String>[] allLists =  new Set[] {
+        Set<String>[] allLists = new Set[]{
             new HashSet<String>(),
             new HashSet<String>(),
             new HashSet<String>(),
@@ -247,8 +221,7 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
                         presence.setFrom(sender);
                         presence.setTo(receiver);
                         XMPPServer.getInstance().getPresenceRouter().route(presence);
-                    }
-                    catch (PacketException e) {
+                    } catch (PacketException e) {
                         logger.error("Failed to cleanup directed presences", e);
                     }
                 }
@@ -260,11 +233,11 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
      * Executes close logic for each session hosted in the remote node that is
      * no longer available. This logic is similar to the close listeners used by
      * the {@link SessionManager}.<p>
-     *
+     * <p>
      * If the node that went down performed its own clean up logic then the other
      * cluster nodes will have the correct state. That means that this method
      * will not find any sessions to remove.<p>
-     *
+     * <p>
      * If this operation is too big and we are still in a cluster then we can
      * distribute the work in the cluster to go faster.
      *
@@ -296,7 +269,7 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
 
         // Remove outgoing server sessions hosted in node that left the cluster
         Set<DomainPair> remoteServers = nodeRoutes.get(key);
-        if (remoteServers!=null) {
+        if (remoteServers != null) {
             for (DomainPair domainPair : remoteServers) {
                 routingTable.removeServerRoute(domainPair);
             }
@@ -315,8 +288,7 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
                         nodes.remove(key);
                         if (nodes.isEmpty()) {
                             componentsCache.remove(address);
-                        }
-                        else {
+                        } else {
                             componentsCache.put(address, nodes);
                         }
                     }
@@ -357,7 +329,7 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
         Set<String> incomingSessions = lookupJIDList(key, incomingServerSessionsCache.getName());
         if (!incomingSessions.isEmpty()) {
             for (String streamIDValue : new ArrayList<>(incomingSessions)) {
-                StreamID streamID = BasicStreamIDFactory.createStreamID( streamIDValue );
+                StreamID streamID = BasicStreamIDFactory.createStreamID(streamIDValue);
                 IncomingServerSession session = sessionLocator.getIncomingServerSession(key.toByteArray(), streamID);
                 // Remove all the hostnames that were registered for this server session
                 for (String hostname : session.getValidatedDomains()) {
@@ -384,8 +356,7 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
                     Presence presence = new Presence(Presence.Type.unavailable);
                     presence.setFrom(offlineJID);
                     XMPPServer.getInstance().getPresenceRouter().route(presence);
-                }
-                catch (PacketException e) {
+                } catch (PacketException e) {
                     logger.error("Failed to cleanup user presence", e);
                 }
             }
@@ -399,8 +370,7 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
                     Presence presence = new Presence(Presence.Type.unavailable);
                     presence.setFrom(offlineJID);
                     XMPPServer.getInstance().getPresenceRouter().route(presence);
-                }
-                catch (PacketException e) {
+                } catch (PacketException e) {
                     logger.error("Failed to cleanp anonymous presence", e);
                 }
             }
@@ -462,8 +432,7 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
                 }
                 if (!handlers.isEmpty()) {
                     senders.put(sender, handlers);
-                }
-                else {
+                } else {
                     // Remove any traces of the sender since no directed presence was sent to this JVM
                     senders.remove(sender);
                 }
@@ -507,6 +476,11 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
         @Override
         public void entryEvicted(EntryEvent<String, Collection<DirectedPresence>> event) {
             entryRemoved(event);
+        }
+
+        @Override
+        public void entryExpired(EntryEvent<String, Collection<DirectedPresence>> entryEvent) {
+            entryRemoved(entryEvent);
         }
 
         private void mapClearedOrEvicted(MapEvent event) {
@@ -576,6 +550,11 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
 
         @Override
         public void entryEvicted(EntryEvent<String, Set<NodeID>> event) {
+            entryRemoved(event);
+        }
+
+        @Override
+        public void entryExpired(EntryEvent<String, Set<NodeID>> event) {
             entryRemoved(event);
         }
 
@@ -689,7 +668,7 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
             ClusterManager.fireJoinedCluster(nodeID.toByteArray(), true);
         }
         clusterNodesInfo.put(nodeID,
-                new HazelcastClusterNodeInfo(event.getMember(), cluster.getClusterTime()));
+            new HazelcastClusterNodeInfo(event.getMember(), cluster.getClusterTime()));
     }
 
     @Override
@@ -713,7 +692,7 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
                 ClusterManager.fireMarkedAsSeniorClusterMember();
             }
             cleanupNode(nodeID);
-            
+
             // Remove traces of directed presences sent from local entities to handlers that no longer exist.
             // At this point c2s sessions are gone from the routing table so we can identify expired sessions
             XMPPServer.getInstance().getPresenceUpdateHandler().removedExpiredPresences();
@@ -722,7 +701,7 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
         NodeID.deleteInstance(nodeID.toByteArray());
         clusterNodesInfo.remove(nodeID);
     }
-    
+
     @SuppressWarnings("WeakerAccess")
     public List<ClusterNodeInfo> getClusterNodesInfo() {
         return new ArrayList<>(clusterNodesInfo.values());
@@ -735,13 +714,6 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
         } else if (event.getState().equals(LifecycleState.STARTED)) {
             joinCluster();
         }
-    }
-
-    @Override
-    public void memberAttributeChanged(MemberAttributeEvent event) {
-        ClusterNodeInfo priorNodeInfo = clusterNodesInfo.get(ClusteredCacheFactory.getNodeID(event.getMember()));
-        clusterNodesInfo.put(ClusteredCacheFactory.getNodeID(event.getMember()),
-                new HazelcastClusterNodeInfo(event.getMember(), priorNodeInfo.getJoinedTime()));
     }
 
     class S2SCacheListener implements EntryListener<DomainPair, byte[]> {
@@ -765,6 +737,11 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
 
         @Override
         public void entryEvicted(EntryEvent<DomainPair, byte[]> event) {
+            handleEntryEvent(event, true);
+        }
+
+        @Override
+        public void entryExpired(EntryEvent<DomainPair, byte[]> event) {
             handleEntryEvent(event, true);
         }
 
@@ -804,7 +781,6 @@ public class ClusterListener implements MembershipListener, LifecycleListener {
         public void mapEvicted(MapEvent event) {
             handleMapEvent(event);
         }
-
     }
 
     boolean isClusterMember() {

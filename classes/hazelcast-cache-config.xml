@@ -14,18 +14,17 @@
   ~ See the License for the specific language governing permissions and
   ~ limitations under the License.
   -->
-<hazelcast xmlns="http://www.hazelcast.com/schema/config"
-           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-           xsi:schemaLocation="http://www.hazelcast.com/schema/config
-           http://www.hazelcast.com/schema/config/hazelcast-config-3.11.xsd">
+<hazelcast
+    xmlns="http://www.hazelcast.com/schema/config"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <import resource="${openfireHome}/conf/hazelcast-local-config.xml"/>
     <properties>
-      <property name="hazelcast.logging.type">slf4j</property>
-      <property name="hazelcast.operation.call.timeout.millis">30000</property>
-      <property name="hazelcast.memcache.enabled">false</property>
-      <property name="hazelcast.rest.enabled">false</property>
+        <property name="hazelcast.logging.type">slf4j</property>
+        <property name="hazelcast.operation.call.timeout.millis">30000</property>
+        <property name="hazelcast.memcache.enabled">false</property>
+        <property name="hazelcast.rest.enabled">false</property>
     </properties>
-    <management-center enabled="false"/>
+    <management-center scripting-enabled="false"/>
     <partition-group enabled="false"/>
     <executor-service name="default">
         <pool-size>16</pool-size>
@@ -56,7 +55,7 @@
         <empty-queue-ttl>-1</empty-queue-ttl>
     </queue>
     <!--
-        Default Hazelcast cache configuration for Openfire. 
+        Default Hazelcast cache configuration for Openfire.
     -->
     <map name="default">
         <!--
@@ -105,27 +104,26 @@
             LFU (Least Frequently Used).
             NONE is the default.
         -->
-        <eviction-policy>LRU</eviction-policy>
+        <eviction eviction-policy="LRU" max-size-policy="PER_NODE" size="100000"/>
         <!--
             Maximum size of the map. When max size is reached,
             map is evicted based on the policy defined.
             Any integer between 0 and Integer.MAX_VALUE. 0 means
             Integer.MAX_VALUE. Default is 0.
         -->
-        <max-size policy="PER_NODE">100000</max-size>
         <!--
             When max. size is reached, specified percentage of
             the map will be evicted. Any integer between 0 and 100.
             If 25 is set for example, 25% of the entries will
             get evicted.
         -->
-        <eviction-percentage>25</eviction-percentage>
+        <!--<eviction-percentage>25</eviction-percentage>-->
         <!--
             Minimum time in milliseconds which should pass before checking
             if a partition of this map is evictable or not.
             Default value is 100 millis.
         -->
-        <min-eviction-check-millis>100</min-eviction-check-millis>
+        <!--<min-eviction-check-millis>100</min-eviction-check-millis>-->
         <!--
             While recovering from split-brain (network partitioning),
             map entries in the small cluster will merge into the bigger cluster
@@ -145,9 +143,9 @@
         <!--
             Near cache provides a local view of the clustered map, which is
             ideal for high-read caches. Each cluster member retains a local
-            copy of entries retrieved from the distributed map. This reduces 
-            network load for caches that require frequent reads. However, if 
-            the	entries are updated frequently, there can be a performance 
+            copy of entries retrieved from the distributed map. This reduces
+            network load for caches that require frequent reads. However, if
+            the	entries are updated frequently, there can be a performance
             penalty due to invalidations on the other cluster members.
         -->
         <near-cache>
@@ -157,7 +155,7 @@
             <invalidate-on-change>true</invalidate-on-change>
         </near-cache>
     </map>
-    
+
     <multimap name="default">
         <backup-count>1</backup-count>
         <value-collection-type>SET</value-collection-type>
@@ -170,29 +168,45 @@
     <set name="default">
         <backup-count>1</backup-count>
     </set>
-
+    <!--
     <jobtracker name="default">
-        <max-thread-size>0</max-thread-size>
-        <!-- Queue size 0 means number of partitions * 2 -->
-        <queue-size>0</queue-size>
-        <retry-count>0</retry-count>
-        <chunk-size>1000</chunk-size>
-        <communicate-stats>true</communicate-stats>
-        <topology-changed-strategy>CANCEL_RUNNING_OPERATION</topology-changed-strategy>
-    </jobtracker>
-
+        <max-thread-size>0</max-thread-size>-->
+    <!-- Queue size 0 means number of partitions * 2 -->
+    <!--<queue-size>0</queue-size>
+    <retry-count>0</retry-count>
+    <chunk-size>1000</chunk-size>
+    <communicate-stats>true</communicate-stats>
+    <topology-changed-strategy>CANCEL_RUNNING_OPERATION</topology-changed-strategy>
+</jobtracker>
+-->
+    <cp-subsystem>
+        <cp-member-count>0</cp-member-count>
+        <semaphores>
+            <semaphore>
+                <name>default</name>
+                <jdk-compatible>true</jdk-compatible>
+                <initial-permits>0</initial-permits>
+            </semaphore>
+        </semaphores>
+    </cp-subsystem>
+    <cache name="default">
+        <backup-count>1</backup-count>
+        <async-backup-count>0</async-backup-count>
+    </cache>
+    <!--
     <semaphore name="default">
         <initial-permits>0</initial-permits>
         <backup-count>1</backup-count>
         <async-backup-count>0</async-backup-count>
     </semaphore>
+    -->
 
     <reliable-topic name="default">
         <read-batch-size>10</read-batch-size>
         <topic-overload-policy>BLOCK</topic-overload-policy>
         <statistics-enabled>true</statistics-enabled>
     </reliable-topic>
-    
+
     <ringbuffer name="default">
         <capacity>10000</capacity>
         <backup-count>1</backup-count>
@@ -205,10 +219,10 @@
         <portable-version>0</portable-version>
     </serialization>
 
-    <services enable-defaults="true"/>
+    <!--<services enable-defaults="true"/>-->
 
     <!--  Partitioned Openfire caches without size/time limits (no eviction). -->
-    
+
     <map name="opt-$cacheStats">
         <backup-count>1</backup-count>
         <read-backup-data>true</read-backup-data>
@@ -273,149 +287,133 @@
         <backup-count>1</backup-count>
         <read-backup-data>true</read-backup-data>
     </map>
-    
+
     <!-- Caches with size and/or time limits (TTL) -->
-    
+
     <map name="POP3 Authentication">
         <backup-count>1</backup-count>
-        <max-size policy="PER_NODE">10000</max-size>
         <time-to-live-seconds>3600</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
+        <eviction max-size-policy="PER_NODE" eviction-policy="LRU" size="10000"/>
     </map>
     <map name="LDAP Authentication">
         <backup-count>1</backup-count>
-        <max-size policy="PER_NODE">10000</max-size>
         <time-to-live-seconds>7200</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
+        <eviction max-size-policy="PER_NODE" eviction-policy="LRU" size="10000"/>
     </map>
     <map name="File Transfer">
         <backup-count>1</backup-count>
         <time-to-live-seconds>600</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
+        <eviction eviction-policy="LRU"/>
     </map>
     <map name="File Transfer Cache">
         <backup-count>1</backup-count>
-        <max-size policy="PER_NODE">10000</max-size>
+        <eviction max-size-policy="PER_NODE" eviction-policy="LRU" size="10000"/>
         <time-to-live-seconds>600</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
     </map>
     <map name="Javascript Cache">
         <backup-count>1</backup-count>
-        <max-size policy="PER_NODE">10000</max-size>
+        <eviction max-size-policy="PER_NODE" eviction-policy="LRU" size="10000"/>
         <time-to-live-seconds>864000</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
     </map>
     <map name="Entity Capabilities">
         <backup-count>1</backup-count>
         <time-to-live-seconds>172800</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
+        <eviction eviction-policy="LRU"/>
     </map>
     <map name="Entity Capabilities Users">
         <backup-count>1</backup-count>
         <time-to-live-seconds>172800</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
+        <eviction eviction-policy="LRU"/>
     </map>
     <map name="Favicon Hits">
         <backup-count>1</backup-count>
         <time-to-live-seconds>21600</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
+        <eviction eviction-policy="LRU"/>
     </map>
     <map name="Favicon Misses">
         <backup-count>1</backup-count>
         <time-to-live-seconds>21600</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
+        <eviction eviction-policy="LRU"/>
     </map>
     <map name="Last Activity Cache">
         <backup-count>1</backup-count>
-        <max-size policy="PER_NODE">10000</max-size>
+        <eviction max-size-policy="PER_NODE" eviction-policy="LRU" size="10000"/>
         <time-to-live-seconds>21600</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
     </map>
     <map name="Locked Out Accounts">
         <backup-count>1</backup-count>
         <time-to-live-seconds>900</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
+        <eviction eviction-policy="LRU"/>
     </map>
     <map name="Multicast Service">
         <backup-count>1</backup-count>
-        <max-size policy="PER_NODE">10000</max-size>
+        <eviction max-size-policy="PER_NODE" eviction-policy="LRU" size="10000"/>
         <time-to-live-seconds>86400</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
     </map>
     <map name="Offline Message Size">
         <backup-count>1</backup-count>
-        <max-size policy="PER_NODE">100000</max-size>
+        <eviction max-size-policy="PER_NODE" eviction-policy="LRU" size="100000"/>
         <time-to-live-seconds>43200</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
     </map>
     <map name="Offline Presence Cache">
         <backup-count>1</backup-count>
-        <max-size policy="PER_NODE">100000</max-size>
+        <eviction max-size-policy="PER_NODE" eviction-policy="LRU" size="100000"/>
         <time-to-live-seconds>21600</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
     </map>
     <map name="Privacy Lists">
         <backup-count>1</backup-count>
-        <max-size policy="PER_NODE">100000</max-size>
+        <eviction max-size-policy="PER_NODE" eviction-policy="LRU" size="100000"/>
         <time-to-live-seconds>21600</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
     </map>
     <map name="Remote Users Existence">
         <backup-count>1</backup-count>
-        <max-size policy="PER_NODE">100000</max-size>
+        <eviction max-size-policy="PER_NODE" eviction-policy="LRU" size="100000"/>
         <time-to-live-seconds>600</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
     </map>
     <map name="Remote Server Configurations">
         <backup-count>1</backup-count>
-        <max-size policy="PER_NODE">100000</max-size>
+        <eviction max-size-policy="PER_NODE" eviction-policy="LRU" size="100000"/>
         <time-to-live-seconds>1800</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
     </map>
-    
+
     <!-- These caches have size and/or time limits (idle) -->
-    
+
     <map name="Group Metadata Cache">
         <backup-count>1</backup-count>
         <read-backup-data>true</read-backup-data>
-        <max-size policy="PER_NODE">100000</max-size>
+        <eviction max-size-policy="PER_NODE" eviction-policy="LRU" size="100000"/>
         <max-idle-seconds>3600</max-idle-seconds>
         <time-to-live-seconds>900</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
     </map>
     <map name="Group">
         <backup-count>1</backup-count>
         <read-backup-data>true</read-backup-data>
-        <max-size policy="PER_NODE">100000</max-size>
+        <eviction max-size-policy="PER_NODE" eviction-policy="LRU" size="100000"/>
         <max-idle-seconds>3600</max-idle-seconds>
         <time-to-live-seconds>900</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
     </map>
     <map name="Roster">
         <backup-count>1</backup-count>
         <read-backup-data>true</read-backup-data>
-        <max-size policy="PER_NODE">100000</max-size>
+        <eviction max-size-policy="PER_NODE" eviction-policy="LRU" size="100000"/>
         <max-idle-seconds>3600</max-idle-seconds>
         <time-to-live-seconds>21600</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
     </map>
     <map name="User">
         <backup-count>1</backup-count>
         <read-backup-data>true</read-backup-data>
-        <max-size policy="PER_NODE">100000</max-size>
+        <eviction max-size-policy="PER_NODE" eviction-policy="LRU" size="100000"/>
         <max-idle-seconds>3600</max-idle-seconds>
         <time-to-live-seconds>1800</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
     </map>
-    
+
     <!-- These caches use a near-cache to improve read performance -->
-    
+
     <map name="VCard">
         <backup-count>1</backup-count>
         <read-backup-data>true</read-backup-data>
-        <max-size policy="PER_NODE">100000</max-size>
+        <eviction max-size-policy="PER_NODE" eviction-policy="LRU" size="100000"/>
         <time-to-live-seconds>21600</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
         <near-cache>
             <eviction eviction-policy="LRU" max-size-policy="ENTRY_COUNT" size="10000"/>
             <max-idle-seconds>1800</max-idle-seconds>
@@ -425,9 +423,8 @@
     <map name="Published Items">
         <backup-count>1</backup-count>
         <read-backup-data>true</read-backup-data>
-        <max-size policy="PER_NODE">100000</max-size>
+        <eviction max-size-policy="PER_NODE" eviction-policy="LRU" size="100000"/>
         <time-to-live-seconds>900</time-to-live-seconds>
-        <eviction-policy>LRU</eviction-policy>
         <near-cache>
             <eviction eviction-policy="LRU" max-size-policy="ENTRY_COUNT" size="10000"/>
             <max-idle-seconds>60</max-idle-seconds>

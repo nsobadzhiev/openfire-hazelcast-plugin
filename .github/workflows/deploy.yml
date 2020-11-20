@@ -1,0 +1,27 @@
+# Continuous Deployment workflow
+name: CD
+
+# runs on push on the main branches
+on:
+  push:
+    branches:
+      - master
+      - main
+      - develop
+
+# one job and step to deploy
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # set the AWS token to access the S3 bucket for the maven repository
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+    steps:
+      - # Checks-out the repository under $GITHUB_WORKSPACE, so the job can access it
+      - uses: actions/checkout@v2
+      # deploy
+      - name: maven deploy
+        run: |
+          mvn deploy

@@ -1,0 +1,29 @@
+# Continuous Integration workflow
+name: CI
+
+# run all integration jobs on pull request
+on:
+  pull_request
+
+jobs:
+  # one job for building and testing
+  build_test:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    steps:
+      # Checks-out the repository under $GITHUB_WORKSPACE, so the job can access it
+      - uses: actions/checkout@v2
+
+      # check code formatting
+      #- name: code formatting
+      #  uses: zbeekman/EditorConfig-Action@v1.1.0
+
+      # compile
+      - name: maven build
+        run: |
+          mvn compile
+
+      # test
+      - name: maven test
+        run: |
+          mvn test

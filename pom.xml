@@ -50,6 +50,13 @@
                 <artifactId>jetty-jspc-maven-plugin</artifactId>
             </plugin>
         </plugins>
+        <extensions>
+            <extension>
+                <groupId>com.allogy.maven.wagon</groupId>
+                <artifactId>maven-s3-wagon</artifactId>
+                <version>1.2.0</version>
+            </extension>
+        </extensions>
     </build>
 
     <dependencies>

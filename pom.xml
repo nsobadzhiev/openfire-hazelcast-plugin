@@ -18,6 +18,18 @@
         </developer>
     </developers>
 
+    <!-- where we deploy this project -->
+    <distributionManagement>
+        <snapshotRepository>
+            <id>com.feinfone.maven-repo</id>
+            <url>s3://com.feinfone.maven-repo/snapshot</url>
+        </snapshotRepository>
+        <repository>
+            <id>com.feinfone.maven-repo</id>
+            <url>s3://com.feinfone.maven-repo/release</url>
+        </repository>
+    </distributionManagement>
+
     <repositories>
         <!-- Where we obtain dependencies. -->
         <repository>

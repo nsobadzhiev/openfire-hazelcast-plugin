@@ -15,8 +15,8 @@ jobs:
       - uses: actions/checkout@v2
 
       # check code formatting
-      - name: code formatting
-        uses: zbeekman/EditorConfig-Action@v1.1.0
+      #- name: code formatting
+      #  uses: zbeekman/EditorConfig-Action@v1.1.0
 
       # compile
       - name: maven build

@@ -8,6 +8,7 @@ on:
       - master
       - main
       - develop
+      - fargate-discovery
 
 # one job and step to deploy
 jobs:

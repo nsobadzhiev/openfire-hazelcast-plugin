@@ -10,20 +10,35 @@ jobs:
   build_test:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java: [ 1.8 ]
     steps:
       # Checks-out the repository under $GITHUB_WORKSPACE, so the job can access it
       - uses: actions/checkout@v2
 
-      # check code formatting
-      #- name: code formatting
-      #  uses: zbeekman/EditorConfig-Action@v1.1.0
+      # TODO check as first step if code formatting with .editorconfig is applied properly
+
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v1
+        with:
+          java-version: ${{ matrix.java }}
+
+      - name: Cache Maven repository
+        uses: actions/cache@v1
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-java${{ matrix.java }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-java${{ matrix.java }}-maven-
+            ${{ runner.os }}-
 
       # compile
-      - name: maven build
+      - name: Maven build
         run: |
           mvn compile
 
       # test
-      - name: maven test
+      - name: Maven test
         run: |
           mvn test
